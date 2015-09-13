@@ -1006,6 +1006,136 @@ static ssize_t qpnp_hap_play_mode_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%s\n", str);
 }
 
+/* sysfs store for ramp test data */
+static ssize_t qpnp_hap_min_max_test_data_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct timed_output_dev *timed_dev = dev_get_drvdata(dev);
+	struct qpnp_hap *hap = container_of(timed_dev, struct qpnp_hap,
+					 timed_dev);
+
+	int value = QPNP_TEST_TIMER_MS, i;
+
+	mutex_lock(&hap->lock);
+	qpnp_hap_mod_enable(hap, true);
+	for (i = 0; i < ARRAY_SIZE(qpnp_hap_min_max_test_data); i++) {
+		hrtimer_start(&hap->hap_test_timer,
+			      ktime_set(value / 1000, (value % 1000) * 1000000),
+			      HRTIMER_MODE_REL);
+		qpnp_hap_play_byte(qpnp_hap_min_max_test_data[i], true);
+		wait_for_completion(&hap->completion);
+	}
+
+	qpnp_hap_play_byte(0, false);
+	qpnp_hap_mod_enable(hap, false);
+	mutex_unlock(&hap->lock);
+
+	return count;
+}
+
+/* sysfs show function for min max test data */
+static ssize_t qpnp_hap_min_max_test_data_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	int count = 0, i;
+
+	for (i = 0; i < ARRAY_SIZE(qpnp_hap_min_max_test_data); i++) {
+		count += snprintf(buf + count, PAGE_SIZE - count,
+				"qpnp_haptics: min_max_test_data[%d] = 0x%x\n",
+				i, qpnp_hap_min_max_test_data[i]);
+
+		if (count >= PAGE_SIZE)
+			return PAGE_SIZE - 1;
+	}
+
+	return count;
+
+}
+
+/* sysfs store for ramp test data */
+static ssize_t qpnp_hap_ramp_test_data_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct timed_output_dev *timed_dev = dev_get_drvdata(dev);
+	struct qpnp_hap *hap = container_of(timed_dev, struct qpnp_hap,
+					 timed_dev);
+
+	int value = QPNP_TEST_TIMER_MS, i;
+
+	mutex_lock(&hap->lock);
+	qpnp_hap_mod_enable(hap, true);
+	for (i = 0; i < ARRAY_SIZE(qpnp_hap_ramp_test_data); i++) {
+		hrtimer_start(&hap->hap_test_timer,
+			      ktime_set(value / 1000, (value % 1000) * 1000000),
+			      HRTIMER_MODE_REL);
+		qpnp_hap_play_byte(qpnp_hap_ramp_test_data[i], true);
+		wait_for_completion(&hap->completion);
+	}
+
+	qpnp_hap_play_byte(0, false);
+	qpnp_hap_mod_enable(hap, false);
+	mutex_unlock(&hap->lock);
+
+	return count;
+}
+
+/* sysfs show function for ramp test data */
+static ssize_t qpnp_hap_ramp_test_data_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	int count = 0, i;
+
+	for (i = 0; i < ARRAY_SIZE(qpnp_hap_ramp_test_data); i++) {
+		count += snprintf(buf + count, PAGE_SIZE - count,
+				"qpnp_haptics: ramp_test_data[%d] = 0x%x\n",
+				i, qpnp_hap_ramp_test_data[i]);
+
+		if (count >= PAGE_SIZE)
+			return PAGE_SIZE - 1;
+	}
+
+	return count;
+
+}
+
+static ssize_t qpnp_hap_vmax_mv_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct timed_output_dev *timed_dev = dev_get_drvdata(dev);
+	struct qpnp_hap *hap = container_of(timed_dev, struct qpnp_hap,
+					 timed_dev);
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", hap->vmax_mv);
+}
+
+static ssize_t qpnp_hap_vmax_mv_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct timed_output_dev *timed_dev = dev_get_drvdata(dev);
+	struct qpnp_hap *hap = container_of(timed_dev, struct qpnp_hap,
+					 timed_dev);
+	u32 data;
+	int rc;
+
+	if (sscanf(buf, "%d", &data) != 1)
+		return -EINVAL;
+
+	if (data < QPNP_HAP_VMAX_MIN_MV) {
+		pr_err("%s: mv %d not in range (%d - %d), using min.", __func__, data, QPNP_HAP_VMAX_MIN_MV, QPNP_HAP_VMAX_MAX_MV);
+		data = QPNP_HAP_VMAX_MIN_MV;
+	} else if (data > QPNP_HAP_VMAX_MAX_MV) {
+		pr_err("%s: mv %d not in range (%d - %d), using max.", __func__, data, QPNP_HAP_VMAX_MIN_MV, QPNP_HAP_VMAX_MAX_MV);
+		data = QPNP_HAP_VMAX_MAX_MV;
+	}
+
+	hap->vmax_mv = data;
+	rc = qpnp_hap_vmax_config(hap);
+	if (rc)
+		pr_info("qpnp: error while writing vibration control register\n");
+
+	return strnlen(buf, count);
+}
+
 /* sysfs attributes */
 static struct device_attribute qpnp_hap_attrs[] = {
 	__ATTR(wf_s0, (S_IRUGO | S_IWUSR | S_IWGRP),
@@ -1047,6 +1177,15 @@ static struct device_attribute qpnp_hap_attrs[] = {
 	__ATTR(dump_regs, (S_IRUGO | S_IWUSR | S_IWGRP),
 			qpnp_hap_dump_regs_show,
 			NULL),
+	__ATTR(ramp_test, (S_IRUGO | S_IWUSR | S_IWGRP),
+			qpnp_hap_ramp_test_data_show,
+			qpnp_hap_ramp_test_data_store),
+	__ATTR(min_max_test, (S_IRUGO | S_IWUSR | S_IWGRP),
+			qpnp_hap_min_max_test_data_show,
+			qpnp_hap_min_max_test_data_store),
+	__ATTR(vmax_mv, (S_IRUGO | S_IWUSR | S_IWGRP),
+			qpnp_hap_vmax_mv_show,
+			qpnp_hap_vmax_mv_store),
 };
 
 /* set api for haptics */
