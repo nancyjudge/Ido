@@ -179,6 +179,17 @@ module_param_named(
 	battery_type, fg_batt_type, charp, S_IRUSR | S_IWUSR
 );
 
+static int fg_sram_update_period_ms = 1000;
+module_param_named(
+	sram_update_period_ms, fg_sram_update_period_ms, int, S_IRUSR | S_IWUSR
+);
+
+static bool fg_batt_valid_ocv;
+module_param_named(batt_valid_ocv, fg_batt_valid_ocv, bool, S_IRUSR | S_IWUSR);
+
+static int fg_batt_range_pct;
+module_param_named(batt_range_pct, fg_batt_range_pct, int, S_IRUSR | S_IWUSR);
+
 struct fg_irq {
 	int			irq;
 	unsigned long		disabled;
